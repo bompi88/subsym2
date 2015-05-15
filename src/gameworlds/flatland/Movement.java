@@ -1,5 +1,5 @@
 package gameworlds.flatland;
 
 public enum Movement {
-    FORWARD, LEFTFORWARD, RIGHTFORWARD, BACKWARD
+    FORWARD, LEFTFORWARD, RIGHTFORWARD
 }

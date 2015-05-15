@@ -1,23 +1,17 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.canvas.Canvas?>
-<?import javafx.scene.chart.LineChart?>
-<?import javafx.scene.chart.NumberAxis?>
 <?import javafx.scene.control.*?>
-<?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+
 <GridPane alignment="CENTER" hgap="10.0" vgap="10.0"
           xmlns:fx="http://javafx.com/fxml"
           prefWidth="800"
           prefHeight="1080"
-          fx:controller="project3.FXMLTableViewController">
+          fx:controller="project5.FXMLTableViewController">
     <padding>
         <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
     </padding>
-
-    <!--<Label style="-fx-font: NORMAL 20 Tahoma;" text="Individuals"
-           GridPane.columnIndex="0" GridPane.rowIndex="0">
-    </Label>-->
 
     <Canvas fx:id="simulation"
             GridPane.columnIndex="0" GridPane.rowIndex="0"
@@ -25,43 +19,15 @@
 
     <GridPane GridPane.columnIndex="0" GridPane.rowIndex="1">
             <Text GridPane.columnIndex="0" GridPane.rowIndex="0"
-                  text="Current best: "/>
+                  text="Steps taken: "/>
             <Text GridPane.columnIndex="1" GridPane.rowIndex="0"
-                  fx:id="txtCurrentBestFitness" text="False"/>
+                  fx:id="txtStepsTaken" text="0"/>
 
             <Text GridPane.columnIndex="0" GridPane.rowIndex="1"
-                  text="Total fitness: "/>
+                  text="Poison eaten: "/>
             <Text GridPane.columnIndex="1" GridPane.rowIndex="1"
-                  fx:id="txtCurrentTotalFitness" text="0"/>
+                  fx:id="txtPoisonEaten" text="0"/>
     </GridPane>
-
-    <TableView fx:id="tableView" prefWidth="400"
-               GridPane.columnIndex="0" GridPane.rowIndex="2">
-        <columns>
-            <TableColumn text="Id" prefWidth="100">
-                <cellValueFactory><PropertyValueFactory property="id" />
-                </cellValueFactory>
-            </TableColumn>
-            <TableColumn text="Age" prefWidth="100">
-                <cellValueFactory><PropertyValueFactory property="age" />
-                </cellValueFactory>
-            </TableColumn>
-            <TableColumn fx:id="fitnessColumn" text="Fitness" prefWidth="200">
-                <cellValueFactory><PropertyValueFactory property="fitness" />
-                </cellValueFactory>
-            </TableColumn>
-        </columns>
-
-        <sortOrder>
-            <fx:reference source="fitnessColumn"/>
-        </sortOrder>
-    </TableView>
-
-    <LineChart fx:id="lcAiStatistics"
-            GridPane.columnIndex="0" GridPane.rowIndex="3">
-        <xAxis><NumberAxis label="Epoch" /></xAxis><!--lowerBound="0" upperBound="3" tickUnit="1"-->
-        <yAxis><NumberAxis label="Fitness"/></yAxis>
-    </LineChart>
 
     <GridPane GridPane.columnIndex="1" GridPane.rowIndex="0">
 
@@ -76,15 +42,16 @@
               fx:id="txtIsRunning" text="False"/>
 
         <Text GridPane.columnIndex="0" GridPane.rowIndex="2"
-              text="Current epoch:" />
-        <Text GridPane.columnIndex="1" GridPane.rowIndex="2"
-              fx:id="txtCurrentEpoch" text="0"/>
+              text="Timestep:" />
+        <TextField GridPane.columnIndex="1" GridPane.rowIndex="2"
+                   fx:id="txtfSimulationInterval"/>
 
-        <CheckBox GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2"
-                fx:id="cbStaticWorlds" text="Static worlds" onAction="#toggleStaticWorlds"/>
-
-        <Button GridPane.columnIndex="0" GridPane.rowIndex="4" GridPane.columnSpan="2"
-                text="Toggle Darwinism" onAction="#startAi"/>
+        <Button GridPane.columnIndex="0" GridPane.rowIndex="6" GridPane.columnSpan="2"
+                text="Run AI" onAction="#startAi"/>
+        <Button GridPane.columnIndex="1" GridPane.rowIndex="6" GridPane.columnSpan="2"
+                text="show" onAction="#show"/>
+        <Button GridPane.columnIndex="2" GridPane.rowIndex="6" GridPane.columnSpan="2"
+                text="Open" onAction="#openScenario"/>
     </GridPane>
 
 </GridPane>

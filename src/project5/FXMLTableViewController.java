@@ -1,79 +1,73 @@
 package project5;
 
-import algorithms.ea.statistics.GenerationStatistics;
-import algorithms.eann.IndividualBrain;
-import gameworlds.flatland.Flatland;
-import gameworlds.flatland.Movement;
+import gameworlds.flatland.FlatlandQ;
+import gameworlds.flatland.MovementQ;
 import gameworlds.flatland.sensor.Items;
 import javafx.animation.AnimationTimer;
 import javafx.beans.property.*;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.chart.LineChart;
-import javafx.scene.chart.XYChart;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.TableRow;
-import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.input.MouseButton;
+import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
+import javafx.stage.FileChooser;
 import math.linnalg.Vector2;
 
+import java.io.File;
+import java.io.IOException;
 import java.text.DecimalFormat;
+import java.util.Scanner;
 
 public class FXMLTableViewController {
-    @FXML
-    Canvas simulation;
 
     @FXML
-    TableView<IndividualBrain> tableView;
+    Canvas simulation;
 
     @FXML
     Text txtIsRunning;
 
     @FXML
-    Text txtCurrentEpoch;
+    Text txtStepsTaken;
 
     @FXML
-    Text txtCurrentTotalFitness;
+    Text txtPoisonEaten;
 
     @FXML
-    Text txtCurrentBestFitness;
-
-    @FXML
-    LineChart<Number, Number> lcAiStatistics;
+    TextField txtfSimulationInterval;
 
     @FXML
     TextField txtScenarioRunTimes;
 
-    @FXML
-    CheckBox cbStaticWorlds;
-
     private GraphicsContext gc;
-
-    private ObservableList<IndividualBrain> data;
 
     private AIController aiController;
 
-    private SimpleIntegerProperty currentEpoch;
+    private SimpleDoubleProperty stepsTaken;
 
-    private SimpleBooleanProperty isRunning;
-
-    private SimpleDoubleProperty cTotalFitness;
-
-    private SimpleDoubleProperty cBestFitness;
+    private SimpleDoubleProperty poisonEaten;
 
     private AnimationTimer aiRunner;
 
     private AnimationTimer simulationRunner;
 
-    DecimalFormat decimalFormat = new DecimalFormat("#.##");
+    private DecimalFormat decimalFormat = new DecimalFormat("#.##");
 
+    private int numberOfFood = 0;
+    private int startPosX = 0;
+    private int startPosY = 0;
+
+    Image arrowDown;
+    Image arrowUp;
+    Image arrowRight;
+    Image arrowLeft;
+
+    private FileChooser fileChooser;
+
+    // nanoseconds.
+    private LongProperty minSimulationUpdateInterval = new SimpleLongProperty(1000000000);
 
     /**
      * Run by JavaFX
@@ -85,142 +79,143 @@ public class FXMLTableViewController {
         gc = simulation.getGraphicsContext2D();
         aiController = new AIController();
 
-        currentEpoch = new SimpleIntegerProperty(0);
-        isRunning = new SimpleBooleanProperty(false);
+        stepsTaken = new SimpleDoubleProperty(0);
 
-        cBestFitness = new SimpleDoubleProperty(0);
-        cTotalFitness = new SimpleDoubleProperty(0);
+        poisonEaten = new SimpleDoubleProperty(0);
 
-        data = FXCollections.observableArrayList(aiController.getPopulation());
+        arrowDown = new Image("file:arrow_d.png");
+        arrowUp = new Image("file:arrow_u.png");
+        arrowRight = new Image("file:arrow_r.png");
+        arrowLeft = new Image("file:arrow_l.png");
 
         // ================================================
         // MVC Setup
         // ================================================
-        currentEpoch.addListener((observable, oldValue, newValue) -> {
-            txtCurrentEpoch.setText(newValue.toString());
+
+        stepsTaken.addListener((observable, oldValue, newValue) -> {
+            txtStepsTaken.setText(decimalFormat.format(newValue));
         });
 
-        cBestFitness.addListener((observable, oldValue, newValue) -> {
-            txtCurrentBestFitness.setText(decimalFormat.format(newValue));
+        poisonEaten.addListener((observable, oldValue, newValue) -> {
+            txtPoisonEaten.setText(decimalFormat.format(newValue));
         });
-
-        cTotalFitness.addListener((observable, oldValue, newValue) -> {
-            txtCurrentTotalFitness.setText(decimalFormat.format(newValue));
-        });
-
-        isRunning.addListener(((observable, oldValue, newValue) -> {
-            txtIsRunning.setText(Boolean.toString(newValue));
-            if (newValue)
-                aiRunner.start();
-            else
-                aiRunner.stop();
-        }));
 
         txtScenarioRunTimes.textProperty().addListener((observable, oldValue, newValue) -> {
-            if(newValue.length() > 0) {
+            if (newValue.length() > 0) {
                 Integer value = new Integer(newValue);
-                if(value > 0)
+                if (value > 0)
                     AIController.globalScenariosToRun = value;
             }
 
         });
 
-        tableView.setItems(data);
-        tableView.sort();
+        txtfSimulationInterval.setText(minSimulationUpdateInterval.getValue().toString());
 
-        // ================================================
-        // Graph data
-        // ================================================
-        XYChart.Series<Number, Number> seriesMean = new XYChart.Series<>();
-        seriesMean.setName("Mean");
-        XYChart.Series<Number, Number> seriesSD = new XYChart.Series<>();
-        seriesSD.setName("Standard deviation");
-        XYChart.Series<Number, Number> seriesFittest = new XYChart.Series<>();
-        seriesFittest.setName("Fittest");
-
-        lcAiStatistics.getData().add(seriesMean);
-        lcAiStatistics.getData().add(seriesSD);
-        lcAiStatistics.getData().add(seriesFittest);
+        txtfSimulationInterval.textProperty().addListener(((observable, oldValue, newValue) -> {
+            minSimulationUpdateInterval.set(Long.valueOf(newValue));
+        }));
 
         // ================================================
         // AI runner
         // ================================================
-        aiRunner = new AnimationTimer() {
-            @Override
-            public void handle(long now) {
-                IndividualBrain best = aiController.runOneEpoch();
-
-                currentEpoch.set(aiController.getEpoch());
-
-                data.setAll(aiController.getPopulation());
-                tableView.sort();
-
-                GenerationStatistics gs = new GenerationStatistics(aiController.getPopulation(), aiController.getEpoch());
-
-                seriesMean.getData().add(new XYChart.Data<>(gs.generation, gs.mean));
-                seriesSD.getData().add(new XYChart.Data<>(gs.generation, gs.SD));
-                seriesFittest.getData().add(new XYChart.Data<>(gs.generation, gs.bestIndividual.getFitness()));
-
-                cTotalFitness.set(gs.total);
-                cBestFitness.set(gs.bestIndividual.getFitness());
-            }
-        };
+//        aiRunner = new AnimationTimer() {
+//            @Override
+//            public void handle(long now) {
+//
+//                aiController.run();
+//                System.out.println(Arrays.deepToString(aiController.getCurrentScenario().getWorld()));
+////                stepsTaken.set(aiController.getSteps());
+////                poisonEaten.set(aiController.getPoisonEaten());
+//            }
+//        };
 
         // ================================================
         // Run simulation for one individual
         // ================================================
-        tableView.setRowFactory(tv -> {
-                    TableRow<IndividualBrain> row = new TableRow<>();
-                    row.setOnMouseClicked(event -> {
-                        if (event.getClickCount() == 2 && (!row.isEmpty())) {
-                            IndividualBrain rowData = row.getItem();
-
-                            if (simulationRunner != null)
-                                simulationRunner.stop();
-
-                            System.out.println("Starting last flatland for: " + rowData.getId());
-
-                            simulationRunner = makeSimulationRunner(rowData, aiController.getCurrentScenario());
-
-                            simulationRunner.start();
-                        } else if(event.getButton() == MouseButton.SECONDARY) {
-                            IndividualBrain rowData = row.getItem();
-
-                            if (simulationRunner != null)
-                                simulationRunner.stop();
-
-                            Flatland randomFlatland = new Flatland(10, 1/3.0, 1/3.0);
-                            System.out.println("Starting random flatland for: " + rowData.getId());
-                            simulationRunner = makeSimulationRunner(rowData, randomFlatland);
-                            simulationRunner.start();
-                        }
-                    });
-
-                    return row;
-                }
-        );
+//        tableView.setRowFactory(tv -> {
+//                    TableRow<IndividualBrain> row = new TableRow<>();
+//                    row.setOnMouseClicked(event -> {
+//                        if (event.getClickCount() == 2 && (!row.isEmpty())) {
+//                            IndividualBrain rowData = row.getItem();
+//
+//                            if (simulationRunner != null)
+//                                simulationRunner.stop();
+//
+//                            System.out.println("Starting last flatland for: " + rowData.getId());
+//
+//                            simulationRunner = makeSimulationRunner(rowData, aiController.getCurrentScenario());
+//
+//                            simulationRunner.start();
+//                        } else if(event.getButton() == MouseButton.SECONDARY) {
+//                            IndividualBrain rowData = row.getItem();
+//
+//                            if (simulationRunner != null)
+//                                simulationRunner.stop();
+//
+//                            Flatland randomFlatland = new Flatland(10, 1/3.0, 1/3.0);
+//                            System.out.println("Starting random flatland for: " + rowData.getId());
+//                            simulationRunner = makeSimulationRunner(rowData, randomFlatland);
+//                            simulationRunner.start();
+//                        }
+//                    });
+//
+//                    return row;
+//                }
+//        );
     }
-
 
     @FXML
     protected void startAi(ActionEvent event) {
-        isRunning.set(!isRunning.get());
+        if(simulationRunner != null)
+            simulationRunner.stop();
+
+        aiController.run(Integer.valueOf(txtScenarioRunTimes.getText()));
+        System.out.println(aiController.getLearner().getQ());
     }
 
-    private AnimationTimer makeSimulationRunner(final IndividualBrain individual, final Flatland flatland){
+    @FXML
+    protected void show(ActionEvent event) {
+        if(simulationRunner != null)
+            simulationRunner.stop();
+
+        simulationRunner = makeSimulationRunner( aiController.getCurrentScenario());
+
+        simulationRunner.start();
+    }
+
+    @FXML
+    protected void openScenario(ActionEvent event) {
+
+        if(simulationRunner != null)
+            simulationRunner.stop();
+
+        fileChooser = new FileChooser();
+
+        File file = fileChooser.showOpenDialog(txtIsRunning.getScene().getWindow());
+        fileChooser.setTitle("Open Scenario file");
+
+        if (file != null) {
+            Items[][] scenario = readScenarioFromFile(file.toPath().toString());
+            aiController.setScenario(new FlatlandQ(scenario, numberOfFood, startPosX, startPosY));
+
+            redraw(aiController.getCurrentScenario().getWorld(), aiController.getCurrentScenario().getAgentPosition());
+        }
+    }
+
+    private AnimationTimer makeSimulationRunner(final FlatlandQ flatland){
 
         final LongProperty lastUpdate = new SimpleLongProperty();
-        final long minUpdateInterval = 1000000000; // nanoseconds.
+        final long minUpdateInterval = minSimulationUpdateInterval.get(); // nanoseconds.
         return new AnimationTimer() {
-            Flatland scenario = new Flatland(flatland);
+            FlatlandQ scenario = new FlatlandQ(flatland);
 
             @Override
             public void handle(long now) {
                 int cStep = scenario.getCurrentTotalSteps();
 
                 if (now - lastUpdate.get() > minUpdateInterval) {
-                    if (cStep < 60) {
-                        Movement move = AIController.helperIndividualFindMove(scenario, individual);
+                    if (!scenario.isSolved()) {
+                        MovementQ move = aiController.helperIndividualFindMove(scenario);
                         scenario.move(move);
                         redraw(scenario.getWorld(), scenario.getAgentPosition());
 
@@ -233,18 +228,17 @@ public class FXMLTableViewController {
             }
         };
 }
-    @FXML
-    private void toggleStaticWorlds(ActionEvent event) {
-        AIController.globalIsStatic = cbStaticWorlds.isSelected();
-    }
-
 
     private void redraw(Items[][] world, Vector2 agentPosition) {
+
+        MovementQ[][] directions = aiController.getLearner().getDirectionMap();
+
         gc.clearRect(0, 0, simulation.getWidth(), simulation.getHeight());
 
         int xSize = (int)(simulation.getWidth() / world[0].length);
         int ySize = (int)(simulation.getHeight() / world.length);
 
+        // Draw poison, food and agent
         for (int y = 0; y < world.length; y++) {
             for (int x = 0; x < world[0].length; x++) {
                 if(agentPosition.x == x && agentPosition.y == y) {
@@ -268,5 +262,86 @@ public class FXMLTableViewController {
                 gc.fillRect(x * xSize, y * ySize, xSize, ySize);
             }
         }
+
+        if(directions != null) {
+            // Draw arrows
+            gc.setGlobalAlpha(0.4);
+
+            for (int y = 0; y < directions[0].length; y++) {
+                for (int x = 0; x < directions.length; x++) {
+
+                    if(directions[x][y] == null)
+                        continue;
+
+                    switch (directions[x][y]) {
+                        case LEFT:
+                            gc.drawImage(arrowLeft, x * xSize, y * ySize, xSize, ySize);
+                            break;
+                        case RIGHT:
+                            gc.drawImage(arrowRight, x * xSize, y * ySize, xSize, ySize);
+                            break;
+                        case FORWARD:
+                            gc.drawImage(arrowUp, x * xSize, y * ySize, xSize, ySize);
+                            break;
+                        case BACKWARD:
+                            gc.drawImage(arrowDown, x * xSize, y * ySize, xSize, ySize);
+                            break;
+                    }
+                }
+            }
+            gc.setGlobalAlpha(1);
+        }
+    }
+
+    public Items[][] readScenarioFromFile(String fileName){
+        Scanner scanner = null;
+        Scanner scenarioFile = null;
+        Items[][] scenario = null;
+
+        try {
+
+            scenarioFile = new Scanner(new File(fileName));
+
+            String firstLine = scenarioFile.nextLine();
+            scanner = new Scanner(firstLine);
+            scanner.useDelimiter(" ");
+
+            int w = scanner.nextInt();
+            int h = scanner.nextInt();
+            startPosX = scanner.nextInt();
+            startPosY = scanner.nextInt();
+            numberOfFood = scanner.nextInt();
+
+            scanner.close();
+
+            scenario = new Items[w][h];
+
+            for(int i = 0; i < h; i++) {
+                String line = scenarioFile.nextLine();
+                scanner = new Scanner(line);
+                scanner.useDelimiter(" ");
+
+                for(int j = 0; j < w; j++) {
+                    int cell = scanner.nextInt();
+
+                    switch (cell) {
+                        case -2: scenario[j][i] = Items.START; break;
+                        case -1: scenario[j][i] = Items.POISON; break;
+                        case 0: scenario[j][i] = Items.NOTHING; break;
+                        default: scenario[j][i] = Items.FOOD; break;
+                    }
+                }
+                scanner.close();
+            }
+
+            scenarioFile.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (scanner != null)scanner.close();
+            if (scenarioFile != null) scenarioFile.close();
+        }
+        return scenario;
     }
 }
